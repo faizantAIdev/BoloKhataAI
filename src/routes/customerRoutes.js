@@ -7,30 +7,59 @@ const {
   deleteCustomer,
   updateCustomer,
   getCustomerLedger,
-
 } = require('../controllers/customerController');
+
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 
 // GET all customers
-router.get('/', getCustomers);
+router.get(
+  '/',
+  authMiddleware,
+  getCustomers
+);
 
 
 // CREATE customer
-router.post('/', createCustomer);
+router.post(
+  '/',
+  authMiddleware,
+  createCustomer
+);
 
 
 // GET single customer
-router.get('/:id', getCustomer);
+router.get(
+  '/:id',
+  authMiddleware,
+  getCustomer
+);
 
 
 // DELETE customer
-router.delete('/:id', deleteCustomer);
+router.delete(
+  '/:id',
+  authMiddleware,
+  deleteCustomer
+);
 
-router.put('/:id', updateCustomer);
 
-router.get('/:id/transactions', getCustomerLedger);
+// UPDATE customer
+router.put(
+  '/:id',
+  authMiddleware,
+  updateCustomer
+);
+
+
+// GET customer ledger
+router.get(
+  '/:id/transactions',
+  authMiddleware,
+  getCustomerLedger
+);
 
 
 module.exports = router;

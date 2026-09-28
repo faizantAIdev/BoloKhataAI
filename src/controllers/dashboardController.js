@@ -1,3 +1,4 @@
+
 const supabase = require('../config/supabase');
 
 const {
@@ -14,14 +15,11 @@ const getDashboard = async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { user_id } = req.query;
+    // ======================================
+    // JWT USER
+    // ======================================
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    const user_id = req.user.id;
 
     // ======================================
     // CHECK TRANSACTION VIEW PERMISSION
@@ -79,14 +77,18 @@ const getDashboard = async (req, res) => {
           ascending: false,
         });
 
-      const queryTime = Date.now() - queryStart;
+      const queryTime =
+        Date.now() - queryStart;
 
       console.log(
         `🟢 Dashboard Supabase Query: ${queryTime}ms`
       );
 
       if (error) {
-        console.error('Supabase Error:', error);
+        console.error(
+          'Supabase Error:',
+          error
+        );
 
         return res.status(500).json({
           success: false,
@@ -112,7 +114,8 @@ const getDashboard = async (req, res) => {
     let totalSupplierPayment = 0;
 
     transactions.forEach((transaction) => {
-      const amount = Number(transaction.amount);
+      const amount =
+        Number(transaction.amount);
 
       // Customer credit
       if (transaction.type === 'credit') {
@@ -142,10 +145,12 @@ const getDashboard = async (req, res) => {
     });
 
     const totalReceivable =
-      totalCredit - totalCustomerPayment;
+      totalCredit -
+      totalCustomerPayment;
 
     const totalPayable =
-      totalPurchase - totalSupplierPayment;
+      totalPurchase -
+      totalSupplierPayment;
 
     // ======================================
     // TODAY'S TRANSACTIONS
@@ -153,22 +158,42 @@ const getDashboard = async (req, res) => {
 
     const today = new Date();
 
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay =
+      new Date(today);
 
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
+    startOfDay.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+    const endOfDay =
+      new Date(today);
+
+    endOfDay.setHours(
+      23,
+      59,
+      59,
+      999
+    );
 
     const todayTransactions =
-      transactions.filter((transaction) => {
-        const transactionDate =
-          new Date(transaction.created_at);
+      transactions.filter(
+        (transaction) => {
+          const transactionDate =
+            new Date(
+              transaction.created_at
+            );
 
-        return (
-          transactionDate >= startOfDay &&
-          transactionDate <= endOfDay
-        );
-      });
+          return (
+            transactionDate >=
+              startOfDay &&
+            transactionDate <=
+              endOfDay
+          );
+        }
+      );
 
     // ======================================
     // RECENT TRANSACTIONS
@@ -190,7 +215,10 @@ const getDashboard = async (req, res) => {
     return res.json({
       success: true,
 
-      // Dashboard always visible
+      // ======================================
+      // SUMMARY
+      // ======================================
+
       summary: {
         total_receivable:
           canViewTransactions
@@ -203,6 +231,10 @@ const getDashboard = async (req, res) => {
             : 0,
       },
 
+      // ======================================
+      // TODAY
+      // ======================================
+
       today: {
         total_transactions:
           canViewTransactions
@@ -214,6 +246,10 @@ const getDashboard = async (req, res) => {
             ? todayTransactions
             : [],
       },
+
+      // ======================================
+      // RECENT
+      // ======================================
 
       recent_transactions:
         canViewTransactions
@@ -233,13 +269,17 @@ const getDashboard = async (req, res) => {
       }ms`
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
   }
 };
 
+
+// ======================================
+// EXPORT
+// ======================================
 
 module.exports = {
   getDashboard,

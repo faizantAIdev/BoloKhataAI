@@ -1,4 +1,3 @@
-
 const supabase = require('../config/supabase');
 
 const {
@@ -15,14 +14,8 @@ const getCustomers = async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     // Check view permission
     await requirePermission(
@@ -30,7 +23,8 @@ const getCustomers = async (req, res) => {
       'can_view_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     console.log(
       `👤 User: ${user_id} → Business Owner: ${businessOwnerId}`
@@ -40,7 +34,9 @@ const getCustomers = async (req, res) => {
 
     const { data, error } = await supabase
       .from('customers')
-      .select('id, user_id, name, mobile, created_at')
+      .select(
+        'id, user_id, name, mobile, created_at'
+      )
       .eq('user_id', businessOwnerId)
       .order('created_at', {
         ascending: false,
@@ -73,16 +69,20 @@ const getCustomers = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get Customers Error:', error);
+    console.error(
+      'Get Customers Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to view customers',
+        message:
+          'You do not have permission to view customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
@@ -97,17 +97,12 @@ const getCustomers = async (req, res) => {
 const createCustomer = async (req, res) => {
   try {
     const {
-      user_id,
       name,
       mobile,
     } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se user ID
+    const user_id = req.user.id;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -122,7 +117,8 @@ const createCustomer = async (req, res) => {
       'can_manage_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     const { data, error } = await supabase
       .from('customers')
@@ -137,7 +133,10 @@ const createCustomer = async (req, res) => {
       .single();
 
     if (error) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
@@ -147,21 +146,26 @@ const createCustomer = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Customer created successfully',
+      message:
+        'Customer created successfully',
       customer: data,
     });
 
   } catch (error) {
-    console.error('Create Customer Error:', error);
+    console.error(
+      'Create Customer Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to manage customers',
+        message:
+          'You do not have permission to manage customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
@@ -176,14 +180,9 @@ const createCustomer = async (req, res) => {
 const getCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se user ID
+    const user_id = req.user.id;
 
     // Check view permission
     await requirePermission(
@@ -191,9 +190,13 @@ const getCustomer = async (req, res) => {
       'can_view_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from('customers')
       .select('*')
       .eq('id', id)
@@ -213,16 +216,20 @@ const getCustomer = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get Customer Error:', error);
+    console.error(
+      'Get Customer Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to view customers',
+        message:
+          'You do not have permission to view customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
@@ -237,14 +244,9 @@ const getCustomer = async (req, res) => {
 const deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se user ID
+    const user_id = req.user.id;
 
     // Check manage permission
     await requirePermission(
@@ -252,7 +254,8 @@ const deleteCustomer = async (req, res) => {
       'can_manage_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     const {
       data: customer,
@@ -293,20 +296,25 @@ const deleteCustomer = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Customer deleted successfully',
+      message:
+        'Customer deleted successfully',
     });
 
   } catch (error) {
-    console.error('Delete Customer Error:', error);
+    console.error(
+      'Delete Customer Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to manage customers',
+        message:
+          'You do not have permission to manage customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
@@ -323,17 +331,12 @@ const updateCustomer = async (req, res) => {
     const { id } = req.params;
 
     const {
-      user_id,
       name,
       mobile,
     } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se user ID
+    const user_id = req.user.id;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -348,7 +351,8 @@ const updateCustomer = async (req, res) => {
       'can_manage_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     const {
       data,
@@ -365,7 +369,10 @@ const updateCustomer = async (req, res) => {
       .single();
 
     if (error || !data) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(404).json({
         success: false,
@@ -375,21 +382,26 @@ const updateCustomer = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Customer updated successfully',
+      message:
+        'Customer updated successfully',
       customer: data,
     });
 
   } catch (error) {
-    console.error('Update Customer Error:', error);
+    console.error(
+      'Update Customer Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to manage customers',
+        message:
+          'You do not have permission to manage customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });
@@ -406,14 +418,9 @@ const getCustomerLedger = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se user ID
+    const user_id = req.user.id;
 
     // Check view permission
     await requirePermission(
@@ -421,7 +428,8 @@ const getCustomerLedger = async (req, res) => {
       'can_view_customers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     // ======================================
     // GET CUSTOMER
@@ -434,7 +442,9 @@ const getCustomerLedger = async (req, res) => {
       error: customerError,
     } = await supabase
       .from('customers')
-      .select('id, user_id, name, mobile')
+      .select(
+        'id, user_id, name, mobile'
+      )
       .eq('id', id)
       .eq('user_id', businessOwnerId)
       .single();
@@ -495,7 +505,9 @@ const getCustomerLedger = async (req, res) => {
     let totalPayment = 0;
 
     transactions.forEach((transaction) => {
-      const amount = Number(transaction.amount);
+      const amount = Number(
+        transaction.amount
+      );
 
       if (transaction.type === 'credit') {
         totalCredit += amount;
@@ -506,7 +518,8 @@ const getCustomerLedger = async (req, res) => {
       }
     });
 
-    const balance = totalCredit - totalPayment;
+    const balance =
+      totalCredit - totalPayment;
 
     console.log(
       `⏱️ Customer Ledger Total: ${
@@ -526,7 +539,7 @@ const getCustomerLedger = async (req, res) => {
       summary: {
         total_credit: totalCredit,
         total_payment: totalPayment,
-        balance: balance,
+        balance,
       },
 
       transactions,
@@ -541,11 +554,12 @@ const getCustomerLedger = async (req, res) => {
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to view customers',
+        message:
+          'You do not have permission to view customers',
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
     });

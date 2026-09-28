@@ -6,26 +6,78 @@ const {
   getSupplier,
   updateSupplier,
   deleteSupplier,
-  getSupplierLedger
+  getSupplierLedger,
 } = require('../controllers/supplierController');
+
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+
+// ======================================
 // GET ALL SUPPLIERS
-router.get('/', getSuppliers);
-router.get('/:id/transactions', getSupplierLedger);
+// ======================================
 
+router.get(
+  '/',
+  authMiddleware,
+  getSuppliers
+);
+
+
+// ======================================
+// GET SUPPLIER LEDGER
+// ======================================
+
+router.get(
+  '/:id/transactions',
+  authMiddleware,
+  getSupplierLedger
+);
+
+
+// ======================================
 // CREATE SUPPLIER
-router.post('/', createSupplier);
+// ======================================
 
+router.post(
+  '/',
+  authMiddleware,
+  createSupplier
+);
+
+
+// ======================================
 // GET SINGLE SUPPLIER
-router.get('/:id', getSupplier);
+// ======================================
 
+router.get(
+  '/:id',
+  authMiddleware,
+  getSupplier
+);
+
+
+// ======================================
 // UPDATE SUPPLIER
-router.put('/:id', updateSupplier);
+// ======================================
 
+router.put(
+  '/:id',
+  authMiddleware,
+  updateSupplier
+);
+
+
+// ======================================
 // DELETE SUPPLIER
-router.delete('/:id', deleteSupplier);
+// ======================================
+
+router.delete(
+  '/:id',
+  authMiddleware,
+  deleteSupplier
+);
 
 
 module.exports = router;

@@ -8,21 +8,64 @@ const {
   deleteTransaction,
 } = require('../controllers/transactionController');
 
+const authMiddleware = require('../middleware/authMiddleware');
+
 const router = express.Router();
 
-// GET ALL
-router.get('/', getTransactions);
 
-// CREATE
-router.post('/', createTransaction);
+// ======================================
+// GET ALL TRANSACTIONS
+// ======================================
 
-// GET SINGLE
-router.get('/:id', getTransaction);
+router.get(
+  '/',
+  authMiddleware,
+  getTransactions
+);
 
-// UPDATE
-router.put('/:id', updateTransaction);
 
-// DELETE
-router.delete('/:id', deleteTransaction);
+// ======================================
+// CREATE TRANSACTION
+// ======================================
+
+router.post(
+  '/',
+  authMiddleware,
+  createTransaction
+);
+
+
+// ======================================
+// GET SINGLE TRANSACTION
+// ======================================
+
+router.get(
+  '/:id',
+  authMiddleware,
+  getTransaction
+);
+
+
+// ======================================
+// UPDATE TRANSACTION
+// ======================================
+
+router.put(
+  '/:id',
+  authMiddleware,
+  updateTransaction
+);
+
+
+// ======================================
+// DELETE TRANSACTION
+// ======================================
+
+router.delete(
+  '/:id',
+  authMiddleware,
+  deleteTransaction
+);
+
 
 module.exports = router;

@@ -1,3 +1,4 @@
+
 const supabase = require('../config/supabase');
 
 const {
@@ -12,14 +13,8 @@ const {
 
 const getTransactions = async (req, res) => {
   try {
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT authenticated user
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -73,7 +68,8 @@ const getTransactions = async (req, res) => {
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to view transactions',
+        message:
+          'You do not have permission to view transactions',
       });
     }
 
@@ -92,7 +88,6 @@ const getTransactions = async (req, res) => {
 const createTransaction = async (req, res) => {
   try {
     const {
-      user_id,
       customer_id,
       supplier_id,
       type,
@@ -101,15 +96,10 @@ const createTransaction = async (req, res) => {
     } = req.body;
 
     // ======================================
-    // USER ID
+    // JWT USER
     // ======================================
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -223,7 +213,8 @@ const createTransaction = async (req, res) => {
       if (!customer) {
         return res.status(404).json({
           success: false,
-          message: 'Customer not found in this business',
+          message:
+            'Customer not found in this business',
         });
       }
     }
@@ -253,7 +244,8 @@ const createTransaction = async (req, res) => {
       if (!supplier) {
         return res.status(404).json({
           success: false,
-          message: 'Supplier not found in this business',
+          message:
+            'Supplier not found in this business',
         });
       }
     }
@@ -266,8 +258,8 @@ const createTransaction = async (req, res) => {
       .from('transactions')
       .insert([
         {
-          // IMPORTANT:
-          // Always save owner/business ID
+          // NEVER trust user_id from frontend
+          // Always use authenticated business owner
           user_id: businessOwnerId,
 
           customer_id: customer_id || null,
@@ -296,12 +288,16 @@ const createTransaction = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create Transaction Error:', error);
+    console.error(
+      'Create Transaction Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to create transactions',
+        message:
+          'You do not have permission to create transactions',
       });
     }
 
@@ -320,21 +316,17 @@ const createTransaction = async (req, res) => {
 const getTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT user
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
       'can_view_transactions'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     const { data, error } = await supabase
       .from('transactions')
@@ -368,12 +360,16 @@ const getTransaction = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get Transaction Error:', error);
+    console.error(
+      'Get Transaction Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to view transactions',
+        message:
+          'You do not have permission to view transactions',
       });
     }
 
@@ -394,7 +390,6 @@ const updateTransaction = async (req, res) => {
     const { id } = req.params;
 
     const {
-      user_id,
       type,
       amount,
       description,
@@ -403,22 +398,18 @@ const updateTransaction = async (req, res) => {
     } = req.body;
 
     // ======================================
-    // USER ID
+    // JWT USER
     // ======================================
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
       'can_create_transactions'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     // ======================================
     // ALLOWED TYPES
@@ -457,7 +448,8 @@ const updateTransaction = async (req, res) => {
     if (type === 'credit' && !customer_id) {
       return res.status(400).json({
         success: false,
-        message: 'customer_id is required for credit',
+        message:
+          'customer_id is required for credit',
       });
     }
 
@@ -490,7 +482,8 @@ const updateTransaction = async (req, res) => {
     if (type === 'purchase' && !supplier_id) {
       return res.status(400).json({
         success: false,
-        message: 'supplier_id is required for purchase',
+        message:
+          'supplier_id is required for purchase',
       });
     }
 
@@ -519,7 +512,8 @@ const updateTransaction = async (req, res) => {
       if (!customer) {
         return res.status(404).json({
           success: false,
-          message: 'Customer not found in this business',
+          message:
+            'Customer not found in this business',
         });
       }
     }
@@ -549,7 +543,8 @@ const updateTransaction = async (req, res) => {
       if (!supplier) {
         return res.status(404).json({
           success: false,
-          message: 'Supplier not found in this business',
+          message:
+            'Supplier not found in this business',
         });
       }
     }
@@ -573,7 +568,10 @@ const updateTransaction = async (req, res) => {
       .single();
 
     if (error || !data) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(404).json({
         success: false,
@@ -583,17 +581,22 @@ const updateTransaction = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Transaction updated successfully',
+      message:
+        'Transaction updated successfully',
       transaction: data,
     });
 
   } catch (error) {
-    console.error('Update Transaction Error:', error);
+    console.error(
+      'Update Transaction Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to update transactions',
+        message:
+          'You do not have permission to update transactions',
       });
     }
 
@@ -612,34 +615,37 @@ const updateTransaction = async (req, res) => {
 const deleteTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT user
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
       'can_delete_transactions'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
-    const { data: transaction, error: transactionError } =
-      await supabase
-        .from('transactions')
-        .select('id')
-        .eq('id', id)
-        .eq('user_id', businessOwnerId)
-        .maybeSingle();
+    // ======================================
+    // VERIFY TRANSACTION
+    // ======================================
+
+    const {
+      data: transaction,
+      error: transactionError,
+    } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', businessOwnerId)
+      .maybeSingle();
 
     if (transactionError) {
       return res.status(500).json({
         success: false,
-        message: transactionError.message,
+        message:
+          transactionError.message,
       });
     }
 
@@ -649,6 +655,10 @@ const deleteTransaction = async (req, res) => {
         message: 'Transaction not found',
       });
     }
+
+    // ======================================
+    // DELETE
+    // ======================================
 
     const { error } = await supabase
       .from('transactions')
@@ -665,16 +675,21 @@ const deleteTransaction = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Transaction deleted successfully',
+      message:
+        'Transaction deleted successfully',
     });
 
   } catch (error) {
-    console.error('Delete Transaction Error:', error);
+    console.error(
+      'Delete Transaction Error:',
+      error
+    );
 
     if (error.statusCode === 403) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to delete transactions',
+        message:
+          'You do not have permission to delete transactions',
       });
     }
 

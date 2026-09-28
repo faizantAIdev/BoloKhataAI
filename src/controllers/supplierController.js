@@ -14,14 +14,8 @@ const getSuppliers = async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -29,7 +23,8 @@ const getSuppliers = async (req, res) => {
     );
 
     // Employee → Owner ID
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     console.log(
       `👤 User: ${user_id} → Business Owner: ${businessOwnerId}`
@@ -39,7 +34,9 @@ const getSuppliers = async (req, res) => {
 
     const { data, error } = await supabase
       .from('suppliers')
-      .select('id, user_id, name, mobile, created_at')
+      .select(
+        'id, user_id, name, mobile, created_at'
+      )
       .eq('user_id', businessOwnerId)
       .order('created_at', {
         ascending: false,
@@ -52,7 +49,10 @@ const getSuppliers = async (req, res) => {
     );
 
     if (error) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
@@ -72,7 +72,10 @@ const getSuppliers = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get Suppliers Error:', error);
+    console.error(
+      'Get Suppliers Error:',
+      error
+    );
 
     console.log(
       `❌ Suppliers Controller Failed: ${
@@ -100,17 +103,12 @@ const getSuppliers = async (req, res) => {
 const createSupplier = async (req, res) => {
   try {
     const {
-      user_id,
       name,
       mobile,
     } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -125,7 +123,8 @@ const createSupplier = async (req, res) => {
     }
 
     // Employee → Owner ID
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     const { data, error } = await supabase
       .from('suppliers')
@@ -140,7 +139,10 @@ const createSupplier = async (req, res) => {
       .single();
 
     if (error) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
@@ -150,12 +152,16 @@ const createSupplier = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Supplier created successfully',
+      message:
+        'Supplier created successfully',
       supplier: data,
     });
 
   } catch (error) {
-    console.error('Create Supplier Error:', error);
+    console.error(
+      'Create Supplier Error:',
+      error
+    );
 
     return res.status(
       error.statusCode || 500
@@ -177,23 +183,22 @@ const createSupplier = async (req, res) => {
 const getSupplier = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
       'can_view_suppliers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from('suppliers')
       .select('*')
       .eq('id', id)
@@ -213,7 +218,10 @@ const getSupplier = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get Supplier Error:', error);
+    console.error(
+      'Get Supplier Error:',
+      error
+    );
 
     return res.status(
       error.statusCode || 500
@@ -237,17 +245,12 @@ const updateSupplier = async (req, res) => {
     const { id } = req.params;
 
     const {
-      user_id,
       name,
       mobile,
     } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -261,9 +264,13 @@ const updateSupplier = async (req, res) => {
       });
     }
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
-    const { data, error } = await supabase
+    const {
+      data,
+      error,
+    } = await supabase
       .from('suppliers')
       .update({
         name: name.trim(),
@@ -275,7 +282,10 @@ const updateSupplier = async (req, res) => {
       .single();
 
     if (error || !data) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(404).json({
         success: false,
@@ -285,12 +295,16 @@ const updateSupplier = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Supplier updated successfully',
+      message:
+        'Supplier updated successfully',
       supplier: data,
     });
 
   } catch (error) {
-    console.error('Update Supplier Error:', error);
+    console.error(
+      'Update Supplier Error:',
+      error
+    );
 
     return res.status(
       error.statusCode || 500
@@ -312,21 +326,17 @@ const updateSupplier = async (req, res) => {
 const deleteSupplier = async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
       'can_manage_suppliers'
     );
 
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     // Check supplier belongs to business
     const {
@@ -360,7 +370,10 @@ const deleteSupplier = async (req, res) => {
       .eq('user_id', businessOwnerId);
 
     if (error) {
-      console.error('Supabase Error:', error);
+      console.error(
+        'Supabase Error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
@@ -370,11 +383,15 @@ const deleteSupplier = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Supplier deleted successfully',
+      message:
+        'Supplier deleted successfully',
     });
 
   } catch (error) {
-    console.error('Delete Supplier Error:', error);
+    console.error(
+      'Delete Supplier Error:',
+      error
+    );
 
     return res.status(
       error.statusCode || 500
@@ -398,14 +415,9 @@ const getSupplierLedger = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id is required',
-      });
-    }
+    // JWT se authenticated user ID
+    const user_id = req.user.id;
 
     await requirePermission(
       user_id,
@@ -413,7 +425,8 @@ const getSupplierLedger = async (req, res) => {
     );
 
     // Employee → Owner ID
-    const businessOwnerId = await getBusinessOwnerId(user_id);
+    const businessOwnerId =
+      await getBusinessOwnerId(user_id);
 
     console.log(
       `👤 User: ${user_id} → Business Owner: ${businessOwnerId}`
@@ -430,7 +443,9 @@ const getSupplierLedger = async (req, res) => {
       error: supplierError,
     } = await supabase
       .from('suppliers')
-      .select('id, user_id, name, mobile')
+      .select(
+        'id, user_id, name, mobile'
+      )
       .eq('id', id)
       .eq('user_id', businessOwnerId)
       .single();
@@ -491,7 +506,9 @@ const getSupplierLedger = async (req, res) => {
     let totalPayment = 0;
 
     transactions.forEach((transaction) => {
-      const amount = Number(transaction.amount);
+      const amount = Number(
+        transaction.amount
+      );
 
       if (transaction.type === 'purchase') {
         totalPurchase += amount;
@@ -502,7 +519,8 @@ const getSupplierLedger = async (req, res) => {
       }
     });
 
-    const balance = totalPurchase - totalPayment;
+    const balance =
+      totalPurchase - totalPayment;
 
     // ======================================
     // 4. TOTAL TIME
@@ -526,10 +544,10 @@ const getSupplierLedger = async (req, res) => {
       summary: {
         total_purchase: totalPurchase,
         total_payment: totalPayment,
-        balance: balance,
+        balance,
       },
 
-      transactions: transactions,
+      transactions,
     });
 
   } catch (error) {
