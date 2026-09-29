@@ -13,6 +13,14 @@ const otpStore = new Map();
 // ======================================
 
 const generateToken = (user) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured on server');
+  }
+
+  if (!user || !user.id) {
+    throw new Error('User ID is missing while generating JWT');
+  }
+
   return jwt.sign(
     {
       id: user.id,
@@ -33,6 +41,10 @@ const sendOtp = async (req, res) => {
   try {
     const { mobile } = req.body;
 
+    // ======================================
+    // VALIDATION
+    // ======================================
+
     if (!mobile) {
       return res.status(400).json({
         success: false,
@@ -40,28 +52,46 @@ const sendOtp = async (req, res) => {
       });
     }
 
-    if (!/^[0-9]{10}$/.test(mobile)) {
+    const cleanMobile = mobile.toString().trim();
+
+    if (!/^[0-9]{10}$/.test(cleanMobile)) {
       return res.status(400).json({
         success: false,
         message: 'Enter a valid 10 digit mobile number',
       });
     }
 
-    // Generate 6 digit OTP
+    // ======================================
+    // GENERATE 6 DIGIT OTP
+    // ======================================
+
     const otp = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
 
-    // Store OTP
-    otpStore.set(mobile, {
+    // ======================================
+    // STORE OTP
+    // ======================================
+
+    otpStore.set(cleanMobile, {
       otp,
       expiresAt: Date.now() + 5 * 60 * 1000,
     });
 
-    // Development only
+    // ======================================
+    // DEVELOPMENT LOG
+    // ======================================
+
     console.log('================================');
-    console.log(`OTP for ${mobile}: ${otp}`);
+    console.log('OTP GENERATED');
+    console.log(`Mobile: ${cleanMobile}`);
+    console.log(`OTP: ${otp}`);
+    console.log('Expires: 5 minutes');
     console.log('================================');
+
+    // ======================================
+    // RESPONSE
+    // ======================================
 
     return res.json({
       success: true,
@@ -72,11 +102,15 @@ const sendOtp = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Send OTP Error:', error);
+    console.error('================================');
+    console.error('SEND OTP ERROR');
+    console.error('Message:', error?.message);
+    console.error('Stack:', error?.stack);
+    console.error('================================');
 
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: error?.message || 'Server error',
     });
   }
 };
@@ -90,6 +124,10 @@ const verifyOtp = async (req, res) => {
   try {
     const { mobile, otp } = req.body;
 
+    // ======================================
+    // VALIDATION
+    // ======================================
+
     if (!mobile || !otp) {
       return res.status(400).json({
         success: false,
@@ -97,11 +135,28 @@ const verifyOtp = async (req, res) => {
       });
     }
 
+    const cleanMobile = mobile.toString().trim();
+    const cleanOtp = otp.toString().trim();
+
+    if (!/^[0-9]{10}$/.test(cleanMobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10 digit mobile number',
+      });
+    }
+
+    if (!/^[0-9]{6}$/.test(cleanOtp)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 6 digit OTP',
+      });
+    }
+
     // ======================================
     // GET STORED OTP
     // ======================================
 
-    const storedOtp = otpStore.get(mobile);
+    const storedOtp = otpStore.get(cleanMobile);
 
     if (!storedOtp) {
       return res.status(400).json({
@@ -115,7 +170,7 @@ const verifyOtp = async (req, res) => {
     // ======================================
 
     if (Date.now() > storedOtp.expiresAt) {
-      otpStore.delete(mobile);
+      otpStore.delete(cleanMobile);
 
       return res.status(400).json({
         success: false,
@@ -127,15 +182,23 @@ const verifyOtp = async (req, res) => {
     // CHECK OTP
     // ======================================
 
-    if (storedOtp.otp !== otp.toString()) {
+    if (storedOtp.otp !== cleanOtp) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP',
       });
     }
 
-    // OTP verified
-    otpStore.delete(mobile);
+    // ======================================
+    // OTP VERIFIED
+    // ======================================
+
+    otpStore.delete(cleanMobile);
+
+    console.log('================================');
+    console.log('OTP VERIFIED');
+    console.log(`Mobile: ${cleanMobile}`);
+    console.log('================================');
 
 
     // ======================================
@@ -150,18 +213,21 @@ const verifyOtp = async (req, res) => {
       .select(
         'id, name, mobile, business_name, business_type, city, created_at'
       )
-      .eq('mobile', mobile)
+      .eq('mobile', cleanMobile)
       .maybeSingle();
 
     if (userError) {
-      console.error(
-        'Existing User Check Error:',
-        userError
-      );
+      console.error('================================');
+      console.error('EXISTING USER CHECK ERROR');
+      console.error('Message:', userError.message);
+      console.error('Details:', userError.details);
+      console.error('Hint:', userError.hint);
+      console.error('Code:', userError.code);
+      console.error('================================');
 
       return res.status(500).json({
         success: false,
-        message: userError.message,
+        message: userError.message || 'Unable to check user',
       });
     }
 
@@ -171,6 +237,9 @@ const verifyOtp = async (req, res) => {
     // ======================================
 
     if (existingUser) {
+
+      console.log('Existing user found:', existingUser.id);
+
 
       // ======================================
       // CHECK PENDING EMPLOYEE INVITE
@@ -182,7 +251,7 @@ const verifyOtp = async (req, res) => {
       } = await supabase
         .from('employee_invites')
         .select('*')
-        .eq('employee_mobile', mobile)
+        .eq('employee_mobile', cleanMobile)
         .eq('status', 'pending')
         .order('created_at', {
           ascending: false,
@@ -191,14 +260,19 @@ const verifyOtp = async (req, res) => {
         .maybeSingle();
 
       if (inviteError) {
-        console.error(
-          'Employee Invite Check Error:',
-          inviteError
-        );
+        console.error('================================');
+        console.error('EMPLOYEE INVITE CHECK ERROR');
+        console.error('Message:', inviteError.message);
+        console.error('Details:', inviteError.details);
+        console.error('Hint:', inviteError.hint);
+        console.error('Code:', inviteError.code);
+        console.error('================================');
 
         return res.status(500).json({
           success: false,
-          message: inviteError.message,
+          message:
+            inviteError.message ||
+            'Unable to check employee invitation',
         });
       }
 
@@ -209,14 +283,24 @@ const verifyOtp = async (req, res) => {
 
       if (pendingInvite) {
 
+        console.log(
+          'Pending employee invite found:',
+          pendingInvite.id
+        );
+
+
         // ======================================
         // PREVENT OWNER BECOMING EMPLOYEE
         // ======================================
 
-        if (pendingInvite.owner_id === existingUser.id) {
+        if (
+          pendingInvite.owner_id ===
+          existingUser.id
+        ) {
           return res.status(400).json({
             success: false,
-            message: 'Owner cannot be added as employee',
+            message:
+              'Owner cannot be added as employee',
           });
         }
 
@@ -231,19 +315,44 @@ const verifyOtp = async (req, res) => {
         } = await supabase
           .from('business_members')
           .select('id, status')
-          .eq('owner_id', pendingInvite.owner_id)
-          .eq('employee_id', existingUser.id)
+          .eq(
+            'owner_id',
+            pendingInvite.owner_id
+          )
+          .eq(
+            'employee_id',
+            existingUser.id
+          )
           .maybeSingle();
 
         if (memberCheckError) {
+          console.error('================================');
           console.error(
-            'Employee Membership Check Error:',
-            memberCheckError
+            'EMPLOYEE MEMBERSHIP CHECK ERROR'
           );
+          console.error(
+            'Message:',
+            memberCheckError.message
+          );
+          console.error(
+            'Details:',
+            memberCheckError.details
+          );
+          console.error(
+            'Hint:',
+            memberCheckError.hint
+          );
+          console.error(
+            'Code:',
+            memberCheckError.code
+          );
+          console.error('================================');
 
           return res.status(500).json({
             success: false,
-            message: memberCheckError.message,
+            message:
+              memberCheckError.message ||
+              'Unable to check employee membership',
           });
         }
 
@@ -260,13 +369,17 @@ const verifyOtp = async (req, res) => {
             .from('business_members')
             .insert([
               {
-                owner_id: pendingInvite.owner_id,
-                employee_id: existingUser.id,
+                owner_id:
+                  pendingInvite.owner_id,
+
+                employee_id:
+                  existingUser.id,
 
                 role: 'employee',
 
                 access_level:
-                  pendingInvite.access_level || 'custom',
+                  pendingInvite.access_level ||
+                  'custom',
 
                 can_view_customers:
                   pendingInvite.can_view_customers,
@@ -300,18 +413,39 @@ const verifyOtp = async (req, res) => {
             ]);
 
           if (memberCreateError) {
+            console.error('================================');
             console.error(
-              'Employee Membership Create Error:',
-              memberCreateError
+              'EMPLOYEE MEMBERSHIP CREATE ERROR'
             );
+            console.error(
+              'Message:',
+              memberCreateError.message
+            );
+            console.error(
+              'Details:',
+              memberCreateError.details
+            );
+            console.error(
+              'Hint:',
+              memberCreateError.hint
+            );
+            console.error(
+              'Code:',
+              memberCreateError.code
+            );
+            console.error('================================');
 
             return res.status(500).json({
               success: false,
-              message: memberCreateError.message,
+              message:
+                memberCreateError.message ||
+                'Unable to create employee membership',
             });
           }
 
-        } else if (existingMember.status !== 'active') {
+        } else if (
+          existingMember.status !== 'active'
+        ) {
 
           // ======================================
           // RE-ACTIVATE OLD EMPLOYEE
@@ -325,7 +459,8 @@ const verifyOtp = async (req, res) => {
               status: 'active',
 
               access_level:
-                pendingInvite.access_level || 'custom',
+                pendingInvite.access_level ||
+                'custom',
 
               can_view_customers:
                 pendingInvite.can_view_customers,
@@ -354,17 +489,39 @@ const verifyOtp = async (req, res) => {
               can_use_voice:
                 pendingInvite.can_use_voice,
             })
-            .eq('id', existingMember.id);
+            .eq(
+              'id',
+              existingMember.id
+            );
 
           if (reactivateError) {
+            console.error('================================');
             console.error(
-              'Employee Reactivation Error:',
-              reactivateError
+              'EMPLOYEE REACTIVATION ERROR'
             );
+            console.error(
+              'Message:',
+              reactivateError.message
+            );
+            console.error(
+              'Details:',
+              reactivateError.details
+            );
+            console.error(
+              'Hint:',
+              reactivateError.hint
+            );
+            console.error(
+              'Code:',
+              reactivateError.code
+            );
+            console.error('================================');
 
             return res.status(500).json({
               success: false,
-              message: reactivateError.message,
+              message:
+                reactivateError.message ||
+                'Unable to reactivate employee',
             });
           }
         }
@@ -381,17 +538,39 @@ const verifyOtp = async (req, res) => {
           .update({
             status: 'accepted',
           })
-          .eq('id', pendingInvite.id);
+          .eq(
+            'id',
+            pendingInvite.id
+          );
 
         if (inviteUpdateError) {
+          console.error('================================');
           console.error(
-            'Employee Invite Update Error:',
-            inviteUpdateError
+            'EMPLOYEE INVITE UPDATE ERROR'
           );
+          console.error(
+            'Message:',
+            inviteUpdateError.message
+          );
+          console.error(
+            'Details:',
+            inviteUpdateError.details
+          );
+          console.error(
+            'Hint:',
+            inviteUpdateError.hint
+          );
+          console.error(
+            'Code:',
+            inviteUpdateError.code
+          );
+          console.error('================================');
 
           return res.status(500).json({
             success: false,
-            message: inviteUpdateError.message,
+            message:
+              inviteUpdateError.message ||
+              'Unable to update employee invitation',
           });
         }
 
@@ -400,7 +579,13 @@ const verifyOtp = async (req, res) => {
         // GENERATE JWT
         // ======================================
 
-        const token = generateToken(existingUser);
+        const token =
+          generateToken(existingUser);
+
+
+        console.log(
+          'Employee JWT generated successfully'
+        );
 
 
         // ======================================
@@ -409,9 +594,12 @@ const verifyOtp = async (req, res) => {
 
         return res.json({
           success: true,
-          message: 'Employee login successful',
+
+          message:
+            'Employee login successful',
 
           isNewUser: false,
+
           isEmployee: true,
 
           token,
@@ -419,12 +607,14 @@ const verifyOtp = async (req, res) => {
           user: existingUser,
 
           business: {
-            owner_id: pendingInvite.owner_id,
+            owner_id:
+              pendingInvite.owner_id,
 
             role: 'employee',
 
             access_level:
-              pendingInvite.access_level || 'custom',
+              pendingInvite.access_level ||
+              'custom',
           },
         });
       }
@@ -434,13 +624,22 @@ const verifyOtp = async (req, res) => {
       // NORMAL USER LOGIN
       // ======================================
 
-      const token = generateToken(existingUser);
+      const token =
+        generateToken(existingUser);
+
+
+      console.log(
+        'Normal user JWT generated successfully'
+      );
+
 
       return res.json({
         success: true,
+
         message: 'Login successful',
 
         isNewUser: false,
+
         isEmployee: false,
 
         token,
@@ -454,6 +653,11 @@ const verifyOtp = async (req, res) => {
     // NEW USER
     // ======================================
 
+    console.log(
+      'No existing user found. Creating new user.'
+    );
+
+
     const {
       data: newUser,
       error: createError,
@@ -461,7 +665,7 @@ const verifyOtp = async (req, res) => {
       .from('users')
       .insert([
         {
-          mobile,
+          mobile: cleanMobile,
           name: 'User',
         },
       ])
@@ -471,16 +675,27 @@ const verifyOtp = async (req, res) => {
       .single();
 
     if (createError) {
-      console.error(
-        'Create User Error:',
-        createError
-      );
+      console.error('================================');
+      console.error('CREATE USER ERROR');
+      console.error('Message:', createError.message);
+      console.error('Details:', createError.details);
+      console.error('Hint:', createError.hint);
+      console.error('Code:', createError.code);
+      console.error('================================');
 
       return res.status(500).json({
         success: false,
-        message: createError.message,
+        message:
+          createError.message ||
+          'Unable to create user',
       });
     }
+
+
+    console.log(
+      'New user created:',
+      newUser.id
+    );
 
 
     // ======================================
@@ -493,8 +708,14 @@ const verifyOtp = async (req, res) => {
     } = await supabase
       .from('employee_invites')
       .select('*')
-      .eq('employee_mobile', mobile)
-      .eq('status', 'pending')
+      .eq(
+        'employee_mobile',
+        cleanMobile
+      )
+      .eq(
+        'status',
+        'pending'
+      )
       .order('created_at', {
         ascending: false,
       })
@@ -502,14 +723,33 @@ const verifyOtp = async (req, res) => {
       .maybeSingle();
 
     if (inviteError) {
+      console.error('================================');
       console.error(
-        'New Employee Invite Check Error:',
-        inviteError
+        'NEW EMPLOYEE INVITE CHECK ERROR'
       );
+      console.error(
+        'Message:',
+        inviteError.message
+      );
+      console.error(
+        'Details:',
+        inviteError.details
+      );
+      console.error(
+        'Hint:',
+        inviteError.hint
+      );
+      console.error(
+        'Code:',
+        inviteError.code
+      );
+      console.error('================================');
 
       return res.status(500).json({
         success: false,
-        message: inviteError.message,
+        message:
+          inviteError.message ||
+          'Unable to check employee invitation',
       });
     }
 
@@ -520,19 +760,28 @@ const verifyOtp = async (req, res) => {
 
     if (pendingInvite) {
 
+      console.log(
+        'New user has pending employee invite'
+      );
+
+
       const {
         error: memberCreateError,
       } = await supabase
         .from('business_members')
         .insert([
           {
-            owner_id: pendingInvite.owner_id,
-            employee_id: newUser.id,
+            owner_id:
+              pendingInvite.owner_id,
+
+            employee_id:
+              newUser.id,
 
             role: 'employee',
 
             access_level:
-              pendingInvite.access_level || 'custom',
+              pendingInvite.access_level ||
+              'custom',
 
             can_view_customers:
               pendingInvite.can_view_customers,
@@ -566,14 +815,33 @@ const verifyOtp = async (req, res) => {
         ]);
 
       if (memberCreateError) {
+        console.error('================================');
         console.error(
-          'New Employee Membership Error:',
-          memberCreateError
+          'NEW EMPLOYEE MEMBERSHIP ERROR'
         );
+        console.error(
+          'Message:',
+          memberCreateError.message
+        );
+        console.error(
+          'Details:',
+          memberCreateError.details
+        );
+        console.error(
+          'Hint:',
+          memberCreateError.hint
+        );
+        console.error(
+          'Code:',
+          memberCreateError.code
+        );
+        console.error('================================');
 
         return res.status(500).json({
           success: false,
-          message: memberCreateError.message,
+          message:
+            memberCreateError.message ||
+            'Unable to create employee membership',
         });
       }
 
@@ -589,17 +857,39 @@ const verifyOtp = async (req, res) => {
         .update({
           status: 'accepted',
         })
-        .eq('id', pendingInvite.id);
+        .eq(
+          'id',
+          pendingInvite.id
+        );
 
       if (inviteUpdateError) {
+        console.error('================================');
         console.error(
-          'New Employee Invite Update Error:',
-          inviteUpdateError
+          'NEW EMPLOYEE INVITE UPDATE ERROR'
         );
+        console.error(
+          'Message:',
+          inviteUpdateError.message
+        );
+        console.error(
+          'Details:',
+          inviteUpdateError.details
+        );
+        console.error(
+          'Hint:',
+          inviteUpdateError.hint
+        );
+        console.error(
+          'Code:',
+          inviteUpdateError.code
+        );
+        console.error('================================');
 
         return res.status(500).json({
           success: false,
-          message: inviteUpdateError.message,
+          message:
+            inviteUpdateError.message ||
+            'Unable to update employee invitation',
         });
       }
 
@@ -608,7 +898,13 @@ const verifyOtp = async (req, res) => {
       // GENERATE JWT
       // ======================================
 
-      const token = generateToken(newUser);
+      const token =
+        generateToken(newUser);
+
+
+      console.log(
+        'New employee JWT generated successfully'
+      );
 
 
       // ======================================
@@ -617,9 +913,12 @@ const verifyOtp = async (req, res) => {
 
       return res.status(201).json({
         success: true,
-        message: 'Employee account created successfully',
+
+        message:
+          'Employee account created successfully',
 
         isNewUser: true,
+
         isEmployee: true,
 
         token,
@@ -627,12 +926,14 @@ const verifyOtp = async (req, res) => {
         user: newUser,
 
         business: {
-          owner_id: pendingInvite.owner_id,
+          owner_id:
+            pendingInvite.owner_id,
 
           role: 'employee',
 
           access_level:
-            pendingInvite.access_level || 'custom',
+            pendingInvite.access_level ||
+            'custom',
         },
       });
     }
@@ -642,13 +943,23 @@ const verifyOtp = async (req, res) => {
     // NORMAL NEW USER
     // ======================================
 
-    const token = generateToken(newUser);
+    const token =
+      generateToken(newUser);
+
+
+    console.log(
+      'New user JWT generated successfully'
+    );
+
 
     return res.status(201).json({
       success: true,
-      message: 'Account created successfully',
+
+      message:
+        'Account created successfully',
 
       isNewUser: true,
+
       isEmployee: false,
 
       token,
@@ -657,14 +968,26 @@ const verifyOtp = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(
-      'Verify OTP Error:',
-      error
-    );
+
+    // ======================================
+    // FULL ERROR LOG
+    // ======================================
+
+    console.error('================================');
+    console.error('VERIFY OTP ERROR');
+    console.error('Message:', error?.message);
+    console.error('Name:', error?.name);
+    console.error('Stack:', error?.stack);
+    console.error('Full Error:', error);
+    console.error('================================');
 
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+
+      // TEMPORARY DEBUG MESSAGE
+      message:
+        error?.message ||
+        'Server error',
     });
   }
 };
@@ -676,6 +999,18 @@ const verifyOtp = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
+
+    // ======================================
+    // CHECK JWT
+    // ======================================
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
 
     // ======================================
     // GET USER ID FROM JWT
@@ -705,9 +1040,12 @@ const logout = async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message: userError.message,
+        message:
+          userError.message ||
+          'Unable to verify user',
       });
     }
+
 
     if (!user) {
       return res.status(404).json({
@@ -727,14 +1065,18 @@ const logout = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(
-      'Logout Error:',
-      error
-    );
+
+    console.error('================================');
+    console.error('LOGOUT ERROR');
+    console.error('Message:', error?.message);
+    console.error('Stack:', error?.stack);
+    console.error('================================');
 
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message:
+        error?.message ||
+        'Server error',
     });
   }
 };
@@ -756,6 +1098,18 @@ const setupBusiness = async (req, res) => {
 
 
     // ======================================
+    // CHECK JWT
+    // ======================================
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+
+    // ======================================
     // GET USER ID FROM JWT
     // ======================================
 
@@ -766,24 +1120,36 @@ const setupBusiness = async (req, res) => {
     // VALIDATION
     // ======================================
 
-    if (!business_name || !business_name.trim()) {
+    if (
+      !business_name ||
+      !business_name.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Business name is required',
+        message:
+          'Business name is required',
       });
     }
 
-    if (!business_type || !business_type.trim()) {
+    if (
+      !business_type ||
+      !business_type.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Business type is required',
+        message:
+          'Business type is required',
       });
     }
 
-    if (!owner_name || !owner_name.trim()) {
+    if (
+      !owner_name ||
+      !owner_name.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Owner name is required',
+        message:
+          'Owner name is required',
       });
     }
 
@@ -809,9 +1175,12 @@ const setupBusiness = async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message: userError.message,
+        message:
+          userError.message ||
+          'Unable to check user',
       });
     }
+
 
     if (!existingUser) {
       return res.status(404).json({
@@ -832,9 +1201,17 @@ const setupBusiness = async (req, res) => {
       .from('users')
       .update({
         name: owner_name.trim(),
-        business_name: business_name.trim(),
-        business_type: business_type.trim(),
-        city: city ? city.trim() : null,
+
+        business_name:
+          business_name.trim(),
+
+        business_type:
+          business_type.trim(),
+
+        city:
+          city
+            ? city.trim()
+            : null,
       })
       .eq('id', user_id)
       .select(
@@ -850,7 +1227,9 @@ const setupBusiness = async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message: updateError.message,
+        message:
+          updateError.message ||
+          'Unable to update business',
       });
     }
 
@@ -861,19 +1240,26 @@ const setupBusiness = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Business setup completed successfully',
+
+      message:
+        'Business setup completed successfully',
+
       user: updatedUser,
     });
 
   } catch (error) {
-    console.error(
-      'Business Setup Error:',
-      error
-    );
+
+    console.error('================================');
+    console.error('BUSINESS SETUP ERROR');
+    console.error('Message:', error?.message);
+    console.error('Stack:', error?.stack);
+    console.error('================================');
 
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message:
+        error?.message ||
+        'Server error',
     });
   }
 };
