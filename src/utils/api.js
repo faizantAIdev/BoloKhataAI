@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_URL = 'https://voicekhataai.onrender.com';
+export const API_URL = 'https://bolokhataai.onrender.com';
 
 const apiFetch = async (endpoint, options = {}) => {
   try {
